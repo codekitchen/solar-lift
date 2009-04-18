@@ -104,3 +104,9 @@ class Ticker
     end
   end
 end
+
+class Numeric
+  def clamp(lo, hi)
+    self < lo ? lo : self > hi ? hi : self
+  end
+end

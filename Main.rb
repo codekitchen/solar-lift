@@ -64,7 +64,8 @@ class Beam < Struct.new(:r, :d)
 
   def update
     @duration += 1
-    return false if @duration > 100
+    $player.beam_charge -= 0.01
+    return false if $player.beam_charge <= 0.0
     self.r = $player.r
     self.d = $player.d
     $window.objects_of_class(Planet).each do |planet|
@@ -72,7 +73,7 @@ class Beam < Struct.new(:r, :d)
         planet.damage!(50_000)
       end
     end
-    $window.wall.grow!(r, (5 + (@duration / 5) * 0.3).floor, -2)
+    $window.wall.grow!(r, (5 + (@duration / 5) * 0.7).floor, -2)
   end
 end
 
@@ -168,14 +169,13 @@ class Pod < Struct.new(:d, :r, :people)
 
 end
 
-class Player < Struct.new(:r, :d)
+class Player < Struct.new(:r, :d, :beam_charge)
   include GLSprite
 
   def initialize
-    super(7.5, 0.0)
+    super(7.5, 0.0, 1.0)
     @fire = Ticker.new(30)
     @pod = Ticker.new(80)
-    @beam = Ticker.new(150)
   end
 
   def sprite_name
@@ -212,6 +212,22 @@ class Player < Struct.new(:r, :d)
         $window.people_saved += peeps
       end
     end
+    self.beam_charge += ($window.people_saved / 1_000_000.0) * 0.001
+    self.beam_charge = 1.0 if beam_charge > 1.0
+  end
+
+  alias_method :draw_gl_1, :draw_gl
+  def draw_gl
+    $window.objects_of_class(Planet).each do |planet|
+      if planet.people > 0 && planet.collide?(self, 7, 25)
+        glDraw(GL_LINES) do
+          glColor4d(1, 1, 1, 1)
+          drawVertexOnPlane(r, d)
+          drawVertexOnPlane(planet.r, planet.d)
+        end
+      end
+    end
+    draw_gl_1
   end
 
   def fire
@@ -226,23 +242,31 @@ class Player < Struct.new(:r, :d)
 
   def beam
     # haha z-indexing
-    @beam.fire { $window.objects.unshift Beam.new(r, d) }
+    if beam_charge > 0.25
+      $window.objects.unshift Beam.new(r, d)
+    end
   end
 
   def halfsize
     10
   end
-
-  # def draw
-  #   @sprite.draw_rot(400, 575, 0, 0)
-  # end
 end
 
 class Wall
   NUM = 180
   STEP = 360.0 / NUM
   def initialize(dst)
-    @segs = [dst] * NUM
+    slope = 0
+    pos = dst
+    @segs = (0...NUM).map do |i|
+      if rand(10) == 0
+        slope += (rand(7) - 3) / 5.0
+        slope = slope.clamp(-2, 2)
+      end
+      pos += slope
+      pos = pos.clamp(dst - 100, dst + 100)
+      pos
+    end
   end
 
   def [](r)
@@ -300,7 +324,7 @@ class SolarLiftWindow < Gosu::Window
     $window = self
     @tickers = []
     $player = @player = Player.new
-    @wall = Wall.new(500)
+    @wall = Wall.new(600)
     @objects = []
     last = 0
     6.times do
@@ -324,7 +348,8 @@ class SolarLiftWindow < Gosu::Window
       close
     when KbSpace
       @player.beam
-      # @pause = !@pause
+    when KbP
+      @pause = !@pause
     end
   end
 
@@ -396,8 +421,8 @@ class SolarLiftWindow < Gosu::Window
 
       @wall.draw_gl
 
-      glEnable(GL_DEPTH_TEST)
-      glClear(GL_DEPTH_BUFFER_BIT)
+      # glEnable(GL_DEPTH_TEST)
+      # glClear(GL_DEPTH_BUFFER_BIT)
 
       @objects.sort_by { |o| -o.d }.each { |o| o.draw_gl }
     end
@@ -406,6 +431,20 @@ class SolarLiftWindow < Gosu::Window
 
     @font1.draw("FPS: #{@fps.fps}", 5, 5, 0)
     @font1.draw("Peeps: #{people_saved}", 5, 15, 0)
+
+    # beam charge
+    color = 0xffffffff
+    draw_line(100, 5, color, width - 100, 5, color)
+    draw_line(100, 15, color, width - 100, 15, color)
+    draw_line(100, 5, color, 100, 15, color)
+    draw_line(width - 100, 5, color, width - 100, 15, color)
+    center = 100 + ((width - 200) / 2)
+    hlen = $player.beam_charge * (width - 200) / 2
+    draw_quad(center - hlen, 7, color,
+              center + hlen, 7, color,
+              center - hlen, 14, color,
+              center + hlen, 14, color)
+    # @font1.draw("Beam Charge: %d%%" % [@player.beam_charge * 100], 5, 25, 0)
   end
 
   def people_saved=(val)
