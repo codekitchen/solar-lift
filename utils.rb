@@ -60,17 +60,21 @@ module GLSprite
     info = sprite.gl_tex_info
     glEnable(GL_TEXTURE_2D)
     glBindTexture(GL_TEXTURE_2D, info.tex_name)
-    glDraw(GL_QUADS) do
-      glColor4d(1, 1, 1, 1)
+    saveMatrix do
       pt = pointOnPlane(r, d)
-      glTexCoord2d(info.left, info.top)
-      glVertex3d(pt[0]-halfsize, pt[1]+halfsize, pt[2])
-      glTexCoord2d(info.left, info.bottom)
-      glVertex3d(pt[0]-halfsize, pt[1]-halfsize, pt[2])
-      glTexCoord2d(info.right, info.bottom)
-      glVertex3d(pt[0]+halfsize, pt[1]-halfsize, pt[2])
-      glTexCoord2d(info.right, info.top)
-      glVertex3d(pt[0]+halfsize, pt[1]+halfsize, pt[2])
+      glTranslated(pt[0], pt[1], pt[2])
+      glRotated(r, 0, 0, 1)
+      glDraw(GL_QUADS) do
+        glColor4d(1, 1, 1, 1)
+        glTexCoord2d(info.left, info.top)
+        glVertex3d(-halfsize, halfsize, 0)
+        glTexCoord2d(info.left, info.bottom)
+        glVertex3d(-halfsize, -halfsize, 0)
+        glTexCoord2d(info.right, info.bottom)
+        glVertex3d(halfsize, -halfsize, 0)
+        glTexCoord2d(info.right, info.top)
+        glVertex3d(halfsize, halfsize, 0)
+      end
     end
     glDisable(GL_TEXTURE_2D)
   end
@@ -79,8 +83,7 @@ module GLSprite
   end
 
   def sprite
-    @@sprite = Gosu::Image.new($window, sprite_name) unless defined?(@@sprite)
-    @@sprite
+    @sprite ||= Gosu::Image.new($window, sprite_name)
   end
 end
 

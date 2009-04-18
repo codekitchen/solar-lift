@@ -8,11 +8,13 @@ require 'gosu'
 require 'utils'
 require 'gl'
 require 'glu'
+require 'glut'
 
 require 'utils'
 
 include Gl
 include Glu
+include Glut
 
 class Bullet < Struct.new(:r, :d)
   include GLSprite
@@ -26,34 +28,90 @@ class Bullet < Struct.new(:r, :d)
   end
 
   def update
-    self.d += 8
+    self.d += 15
+    $window.objects_of_class(Planet).each do |planet|
+      if planet.collide?(self, 0, 5)
+        planet.damage!(100_000)
+        return false
+      end
+    end
     if $window.wall.collide?(r, d)
-      $window.wall.grow!(r, d, 7)
+      $window.wall.grow!(r, 3, 7)
       return false
     end
     return false if self.d > 800
   end
 end
 
-class Planet < Struct.new(:r, :d, :people)
-  include GLSprite
-
-  def initialize(r, d, people = 5_000_000)
+class Beam < Struct.new(:r, :d)
+  def initialize(r, d)
     super
+    @duration = 0
   end
 
-  def sprite_name
-    "images/bullet_ugly.png"
-  end
-
-  def halfsize
-    14
-  end
-
-  def update
+  def draw_gl
+    glDraw(GL_QUADS) do
+      glColor4d(1, 1, 1, 1)
+      drawVertexOnPlane(r-1.5, d)
+      drawVertexOnPlane(r+1.5, d)
+      drawVertexOnPlane(r-1.5, 800)
+      drawVertexOnPlane(r+1.5, 800)
+    end
   end
 
   def draw
+  end
+
+  def update
+    @duration += 1
+    return false if @duration > 100
+    self.r = $player.r
+    self.d = $player.d
+    $window.objects_of_class(Planet).each do |planet|
+      if planet.collide_r?(self, 2) && planet.d >= d
+        planet.damage!(50_000)
+      end
+    end
+    $window.wall.grow!(r, (5 + (@duration / 5) * 0.3).floor, -2)
+  end
+end
+
+class Planet < Struct.new(:r, :d, :people)
+  include GLSprite
+  RADIUS = 10
+
+  def initialize(r, d, people = 3_000_000 + rand(2_000_000))
+    super
+    @red = 0
+  end
+
+  def draw_gl
+    saveMatrix do
+      glRotated(r, 0, 0, 1)
+      glTranslated(0, -100, d)
+      glColor4d(@red, 1 - @red, (1 * (people / 5_000_000.0)) - @red, 1)
+      glutSolidSphere(RADIUS, 30, 30)
+    end
+  end
+
+  def collide?(obj, extra_r = 0, extra_d = 0)
+    collide_r?(obj, extra_r) &&
+      obj.d > (d - RADIUS - extra_d) &&
+      obj.d < (d + RADIUS + extra_d)
+  end
+
+  def collide_r?(obj, extra_r = 0)
+    obj.r > (r - RADIUS - extra_r) &&
+      obj.r < (r + RADIUS + extra_r)
+  end
+
+  def damage!(val)
+    self.people = [people - val, 0].max
+    @red = 1
+  end
+
+  def update
+    @red = [@red - 0.01, 0].max
   end
 end
 
@@ -76,7 +134,7 @@ class Pod < Struct.new(:d, :r, :people)
     self.d += 3
     return false if d > 800
     $window.objects_of_class(Planet).each do |planet|
-      if plane_distance(self, planet) < 55
+      if planet.collide?(self, 2, 5)
         @planet = planet
         @state = :evac
         break
@@ -110,34 +168,55 @@ class Pod < Struct.new(:d, :r, :people)
 
 end
 
-class Player < Struct.new(:r)
+class Player < Struct.new(:r, :d)
+  include GLSprite
+
   def initialize
-    super(7.5)
-    @sprite = Gosu::Image.new($window, "images/player_ugly.png")
+    super(7.5, 0.0)
     @fire = Ticker.new(30)
     @pod = Ticker.new(80)
+    @beam = Ticker.new(150)
   end
 
-  def d
-    0
+  def sprite_name
+    "images/player_ugly.png"
   end
 
   def right
-    self.r -= 0.4
-    self.r += 360.0 if r < -360.0
+    self.r -= 1
+    self.r += 360.0 while r < 0
   end
 
   def left
-    self.r += 0.4
-    self.r -= 360.0 if r > 360.0
+    self.r += 1
+    self.r -= 360.0 while r > 360.0
+  end
+
+  def back
+    self.d = [d - 2, 0].max
+  end
+
+  def forward
+    self.d += 2
   end
 
   def update
+    if $window.wall.collide?(r, d)
+      #DEATH
+      $window.close
+    end
+    $window.objects_of_class(Planet).each do |planet|
+      if planet.collide?(self, 7, 25)
+        peeps = [planet.people, 5_000].min
+        planet.people -= peeps
+        $window.people_saved += peeps
+      end
+    end
   end
 
   def fire
     @fire.fire do
-      $window.objects << Bullet.new(r, 0)
+      $window.objects << Bullet.new(r, d)
     end
   end
 
@@ -145,12 +224,18 @@ class Player < Struct.new(:r)
     @pod.fire { $window.objects << Pod.new(r) }
   end
 
-  def draw
-    @sprite.draw_rot(400, 575, 0, 0)
+  def beam
+    # haha z-indexing
+    @beam.fire { $window.objects.unshift Beam.new(r, d) }
   end
 
-  def draw_gl
+  def halfsize
+    10
   end
+
+  # def draw
+  #   @sprite.draw_rot(400, 575, 0, 0)
+  # end
 end
 
 class Wall
@@ -178,7 +263,7 @@ class Wall
 
   def grow!(r, d, h)
     r = r.floor
-    (r-3 .. r+3).each { |i| self[i] -= h }
+    (r-d .. r+d).each { |i| self[i] -= h }
   end
 
   def draw_gl
@@ -216,8 +301,14 @@ class SolarLiftWindow < Gosu::Window
     @tickers = []
     $player = @player = Player.new
     @wall = Wall.new(500)
-    @objects = [@player]
-    15.times { @objects << Planet.new(rand * 360, 150 + rand * 500, rand(5_000_000)) }
+    @objects = []
+    last = 0
+    6.times do
+      r = last + 15 + 45 * rand
+      last = r
+      @objects << Planet.new(r, 150 + rand * 350)
+    end
+    @objects << @player
     @fps = FPSCounter.new
     @font1 = Gosu::Font.new(self, Gosu.default_font_name, 10)
     @people_saved = 0
@@ -232,7 +323,8 @@ class SolarLiftWindow < Gosu::Window
     when KbEscape
       close
     when KbSpace
-      @pause = !@pause
+      @player.beam
+      # @pause = !@pause
     end
   end
 
@@ -240,8 +332,6 @@ class SolarLiftWindow < Gosu::Window
     @fps.register_tick
     return if @pause
 
-    @tickers.each { |t| t.update }
-    @objects.reject! { |o| o.update == false }
     if button_down?(KbA)
       @player.left
     end
@@ -252,8 +342,12 @@ class SolarLiftWindow < Gosu::Window
       @player.fire
     end
     if button_down?(KbS)
-      @player.escape_pod
+      @player.back
+      # @player.escape_pod
     end
+    @player.forward if button_down?(KbW)
+    @tickers.each { |t| t.update }
+    @objects.reject! { |o| o.update == false }
     @wall.update
   end
 
@@ -271,8 +365,8 @@ class SolarLiftWindow < Gosu::Window
 
       glMatrixMode(GL_MODELVIEW)
       glLoadIdentity
-      gluLookAt(0, -65, -125,
-                0, 0, 800,
+      gluLookAt(0, -65, -117 + @player.d,
+                0, 0, 800 + @player.d,
                 0, 1, 0)
       # gluLookAt(0, 0, -275,
       #           0, 0, 1,
