@@ -67,7 +67,7 @@ class Beam < Struct.new(:r, :d)
     $player.beam_charge -= 0.01
     return false if $player.beam_charge <= 0.0
     self.r = $player.r
-    self.d = $player.d
+    self.d = $player.d + 15
     $window.objects_of_class(Planet).each do |planet|
       if planet.collide_r?(self, 2) && planet.d >= d
         planet.damage!(50_000)
@@ -272,6 +272,7 @@ class Wall
   def initialize(dst)
     slope = 0
     pos = dst
+    # TODO: this code is jacked somehow, probably the constants
     @segs = (0...NUM).map do |i|
       if rand(10) == 0
         slope += (rand(25) - 12)
@@ -302,7 +303,7 @@ class Wall
 
   def grow!(r, d, h)
     r = r.floor
-    (r-d .. r+d).each { |i| self[i] -= h }
+    (r-d .. r+d).each { |i| self[i] = (self[i] - h).clamp(0.0, 800.0) }
   end
 
   def draw_gl
