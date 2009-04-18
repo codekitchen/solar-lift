@@ -35,4 +35,5 @@ class SolarLiftWindow < Gosu::Window
   end
 end
 
-SolarLiftWindow.new().show
+$window = SolarLiftWindow.new()
+$window.show
