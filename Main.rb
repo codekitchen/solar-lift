@@ -15,9 +15,15 @@ include Gl
 include Glu
 
 class Bullet < Struct.new(:r, :d)
+  include GLSprite
+
   def initialize(r, d)
     super
     @@sprite = Gosu::Image.new($window, "images/bullet_ugly.png") unless defined?(@@sprite)
+  end
+
+  def sprite
+    @@sprite
   end
 
   def update
@@ -27,28 +33,6 @@ class Bullet < Struct.new(:r, :d)
       return false
     end
     return false if self.d > 800
-  end
-
-  def draw_gl
-    info = @@sprite.gl_tex_info
-    glEnable(GL_TEXTURE_2D)
-    glBindTexture(GL_TEXTURE_2D, info.tex_name)
-    glDraw(GL_QUADS) do
-      glColor4d(1, 1, 1, 1)
-      pt = pointOnPlane(r, d)
-      glTexCoord2d(info.left, info.top)
-      glVertex3d(pt[0]-3, pt[1]+3, pt[2])
-      glTexCoord2d(info.left, info.bottom)
-      glVertex3d(pt[0]-3, pt[1]-3, pt[2])
-      glTexCoord2d(info.right, info.bottom)
-      glVertex3d(pt[0]+3, pt[1]-3, pt[2])
-      glTexCoord2d(info.right, info.top)
-      glVertex3d(pt[0]+3, pt[1]+3, pt[2])
-    end
-    glDisable(GL_TEXTURE_2D)
-  end
-
-  def draw
   end
 end
 
@@ -110,7 +94,7 @@ class Wall
   end
 
   def update
-    @segs.length.times { |i| @segs[i] -= 0.25 }
+    @segs.length.times { |i| @segs[i] -= 0.05 }
   end
 
   def collide?(r, d)
@@ -186,7 +170,6 @@ class SolarLiftWindow < Gosu::Window
     if button_down?(MsLeft)
       @player.fire
     end
-    # @w -= 3
     @wall.update
   end
 
@@ -235,7 +218,6 @@ class SolarLiftWindow < Gosu::Window
 
       @wall.draw_gl
 
-      # glTranslated(-@pos.x, -@pos.y, -0.05 + @pos.z)
       @objects.each { |o| o.draw_gl }
     end
 

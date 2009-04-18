@@ -45,3 +45,27 @@ class FPSCounter
     end
   end
 end
+
+module GLSprite
+  def draw_gl
+    info = sprite.gl_tex_info
+    glEnable(GL_TEXTURE_2D)
+    glBindTexture(GL_TEXTURE_2D, info.tex_name)
+    glDraw(GL_QUADS) do
+      glColor4d(1, 1, 1, 1)
+      pt = pointOnPlane(r, d)
+      glTexCoord2d(info.left, info.top)
+      glVertex3d(pt[0]-3, pt[1]+3, pt[2])
+      glTexCoord2d(info.left, info.bottom)
+      glVertex3d(pt[0]-3, pt[1]-3, pt[2])
+      glTexCoord2d(info.right, info.bottom)
+      glVertex3d(pt[0]+3, pt[1]-3, pt[2])
+      glTexCoord2d(info.right, info.top)
+      glVertex3d(pt[0]+3, pt[1]+3, pt[2])
+    end
+    glDisable(GL_TEXTURE_2D)
+  end
+
+  def draw
+  end
+end
