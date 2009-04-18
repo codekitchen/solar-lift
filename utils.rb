@@ -18,12 +18,21 @@ end
 
 VPLANE_RATIO = 75.0 / 800
 def pointOnPlane(r, dst)
-  dp = 100 - dst * VPLANE_RATIO
+  # dp = 100 - dst * VPLANE_RATIO
+  dp = 100
   [Gosu.offset_x(r, dp), Gosu.offset_y(r, dp), dst]
 end
 def drawVertexOnPlane(r, dst)
   dp = 100 - dst * VPLANE_RATIO
+  dp = 100
   glVertex3d(Gosu.offset_x(r, dp), Gosu.offset_y(r, dp), dst)
+end
+def plane_distance(o1, o2)
+  # TODO: this isn't even nearly correct
+  # length of arc with radius r and angle t in radians = t*r
+  xdist = (o1.r.gosu_to_radians - o2.r.gosu_to_radians).abs * 100
+  xdist + Math.sqrt((o1.d - o2.d) * (o1.d - o2.d))
+  # Gosu.distance(o1.r * 3, o1.d, o2.r * 3, o2.d)
 end
 
 class FPSCounter
@@ -55,17 +64,40 @@ module GLSprite
       glColor4d(1, 1, 1, 1)
       pt = pointOnPlane(r, d)
       glTexCoord2d(info.left, info.top)
-      glVertex3d(pt[0]-3, pt[1]+3, pt[2])
+      glVertex3d(pt[0]-halfsize, pt[1]+halfsize, pt[2])
       glTexCoord2d(info.left, info.bottom)
-      glVertex3d(pt[0]-3, pt[1]-3, pt[2])
+      glVertex3d(pt[0]-halfsize, pt[1]-halfsize, pt[2])
       glTexCoord2d(info.right, info.bottom)
-      glVertex3d(pt[0]+3, pt[1]-3, pt[2])
+      glVertex3d(pt[0]+halfsize, pt[1]-halfsize, pt[2])
       glTexCoord2d(info.right, info.top)
-      glVertex3d(pt[0]+3, pt[1]+3, pt[2])
+      glVertex3d(pt[0]+halfsize, pt[1]+halfsize, pt[2])
     end
     glDisable(GL_TEXTURE_2D)
   end
 
   def draw
+  end
+
+  def sprite
+    @@sprite = Gosu::Image.new($window, sprite_name) unless defined?(@@sprite)
+    @@sprite
+  end
+end
+
+class Ticker
+  def initialize(steps)
+    @cur = @steps = steps
+    $window.tickers << self
+  end
+
+  def update
+    @cur += 1
+  end
+
+  def fire
+    if @cur >= @steps
+      yield if block_given?
+      @cur = 0
+    end
   end
 end

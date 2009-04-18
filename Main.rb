@@ -17,13 +17,12 @@ include Glu
 class Bullet < Struct.new(:r, :d)
   include GLSprite
 
-  def initialize(r, d)
-    super
-    @@sprite = Gosu::Image.new($window, "images/bullet_ugly.png") unless defined?(@@sprite)
+  def sprite_name
+    "images/bullet_ugly.png"
   end
 
-  def sprite
-    @@sprite
+  def halfsize
+    3
   end
 
   def update
@@ -36,20 +35,114 @@ class Bullet < Struct.new(:r, :d)
   end
 end
 
-class Player
-  def initialize
-    @sprite = Gosu::Image.new($window, "images/player_ugly.png")
-    @fire = Ticker.new(30)
+class Planet < Struct.new(:r, :d, :people)
+  include GLSprite
+
+  def initialize(r, d, people = 5_000_000)
+    super
+  end
+
+  def sprite_name
+    "images/bullet_ugly.png"
+  end
+
+  def halfsize
+    14
   end
 
   def update
-    @fire.tick
+  end
+
+  def draw
+  end
+end
+
+class Pod < Struct.new(:d, :r, :people)
+  include GLSprite
+
+  def sprite_name
+    "images/bullet_ugly.png"
+  end
+
+  def halfsize
+    8
+  end
+
+  def update
+    send @state
+  end
+
+  def seeking
+    self.d += 3
+    return false if d > 800
+    $window.objects_of_class(Planet).each do |planet|
+      if plane_distance(self, planet) < 55
+        @planet = planet
+        @state = :evac
+        break
+      end
+    end
+  end
+
+  def evac
+    self.d = @planet.d
+    self.r = @planet.r
+    peeps = [@planet.people, 5_000].min
+    self.people += peeps
+    @planet.people -= peeps
+    if @planet.people <= 0
+      @state = :flee
+    end
+  end
+
+  def flee
+    self.d -= 3
+    if d < 0
+      $window.people_saved += people
+      return false
+    end
+  end
+
+  def initialize(r)
+    super(0.0, r, 0)
+    @state = :seeking
+  end
+
+end
+
+class Player < Struct.new(:r)
+  def initialize
+    super(7.5)
+    @sprite = Gosu::Image.new($window, "images/player_ugly.png")
+    @fire = Ticker.new(30)
+    @pod = Ticker.new(80)
+  end
+
+  def d
+    0
+  end
+
+  def right
+    self.r -= 0.4
+    self.r += 360.0 if r < -360.0
+  end
+
+  def left
+    self.r += 0.4
+    self.r -= 360.0 if r > 360.0
+  end
+
+  def update
   end
 
   def fire
     @fire.fire do
-      $window.objects << Bullet.new(-$window.r, 0)
+      $window.objects << Bullet.new(r, 0)
     end
+  end
+
+  def escape_pod
+    @pod.fire { $window.objects << Pod.new(r) }
   end
 
   def draw
@@ -57,24 +150,6 @@ class Player
   end
 
   def draw_gl
-  end
-end
-
-class Ticker
-  def initialize(steps)
-    @steps = steps
-    @cur = 1
-  end
-
-  def tick
-    @cur += 1
-  end
-
-  def fire
-    if @cur >= @steps
-      yield if block_given?
-      @cur = 0
-    end
   end
 end
 
@@ -133,17 +208,23 @@ end
 class SolarLiftWindow < Gosu::Window
   include Gosu
 
-  attr_reader :objects, :r, :wall, :actions
+  attr_reader :objects, :wall, :actions, :tickers, :people_saved
 
   def initialize
     super(800, 600, false)
     $window = self
-    @player = Player.new
+    @tickers = []
+    $player = @player = Player.new
     @wall = Wall.new(500)
     @objects = [@player]
-    @r = 7.5
+    15.times { @objects << Planet.new(rand * 360, 150 + rand * 500, rand(5_000_000)) }
     @fps = FPSCounter.new
     @font1 = Gosu::Font.new(self, Gosu.default_font_name, 10)
+    @people_saved = 0
+  end
+
+  def objects_of_class(klass)
+    @objects.find_all { |o| o.is_a?(klass) }
   end
 
   def button_up(butt)
@@ -158,17 +239,20 @@ class SolarLiftWindow < Gosu::Window
   def update
     @fps.register_tick
     return if @pause
+
+    @tickers.each { |t| t.update }
     @objects.reject! { |o| o.update == false }
     if button_down?(KbA)
-      @r -= 0.4
-      @r += 360.0 if @r < -360.0
+      @player.left
     end
     if button_down?(KbD)
-      @r += 0.4
-      @r -= 360.0 if @r > 360.0
+      @player.right
     end
     if button_down?(MsLeft)
       @player.fire
+    end
+    if button_down?(KbS)
+      @player.escape_pod
     end
     @wall.update
   end
@@ -179,7 +263,7 @@ class SolarLiftWindow < Gosu::Window
       glEnable(GL_BLEND)
       glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
       glDisable(GL_DEPTH_TEST)
-      glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT)
+      glClear(GL_COLOR_BUFFER_BIT)
 
       glMatrixMode(GL_PROJECTION)
       glLoadIdentity
@@ -194,7 +278,7 @@ class SolarLiftWindow < Gosu::Window
       #           0, 0, 1,
       #           0, 1, 0)
 
-      glRotated(@r, 0, 0, 1)
+      glRotated(-@player.r, 0, 0, 1)
 
       dp = 100
 
@@ -218,12 +302,21 @@ class SolarLiftWindow < Gosu::Window
 
       @wall.draw_gl
 
-      @objects.each { |o| o.draw_gl }
+      glEnable(GL_DEPTH_TEST)
+      glClear(GL_DEPTH_BUFFER_BIT)
+
+      @objects.sort_by { |o| -o.d }.each { |o| o.draw_gl }
     end
 
     @objects.each { |o| o.draw }
 
     @font1.draw("FPS: #{@fps.fps}", 5, 5, 0)
+    @font1.draw("Peeps: #{people_saved}", 5, 15, 0)
+  end
+
+  def people_saved=(val)
+    raise "blah" if val < @people_saved
+    @people_saved = val
   end
 end
 
