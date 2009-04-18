@@ -84,15 +84,21 @@ class Planet < Struct.new(:r, :d, :people)
   def initialize(r, d, people = 3_000_000 + rand(2_000_000))
     super
     @red = 0
+    self.people = people
   end
 
   def draw_gl
     saveMatrix do
       glRotated(r, 0, 0, 1)
       glTranslated(0, -100, d)
-      glColor4d(@red, 1 - @red, (1 * (people / 5_000_000.0)) - @red, 1)
-      glutSolidSphere(RADIUS, 30, 30)
+      glColor4d((@people_color + @red).clamp(0, 1), 1 - @red, (@people_color - @red).clamp(0, 1), 1)
+      glutSolidSphere(RADIUS, 20, 20)
     end
+  end
+
+  def people=(val)
+    super
+    @people_color = 1.0 - (people / 5_000_000.0)
   end
 
   def collide?(obj, extra_r = 0, extra_d = 0)
@@ -109,10 +115,15 @@ class Planet < Struct.new(:r, :d, :people)
   def damage!(val)
     self.people = [people - val, 0].max
     @red = 1
+    return false if people == 0
   end
 
   def update
     @red = [@red - 0.01, 0].max
+    self.d += (people == 0 ? 20 : 1) * $window.wall.pulling_speed
+    if $window.wall.collide?(r, d)
+      self.damage!(1_000_000)
+    end
   end
 end
 
@@ -157,7 +168,7 @@ class Pod < Struct.new(:d, :r, :people)
   def flee
     self.d -= 3
     if d < 0
-      $window.people_saved += people
+      $window.save_people people
       return false
     end
   end
@@ -173,7 +184,7 @@ class Player < Struct.new(:r, :d, :beam_charge)
   include GLSprite
 
   def initialize
-    super(7.5, 0.0, 1.0)
+    super(7.5, 300.0, 1.0)
     @fire = Ticker.new(30)
     @pod = Ticker.new(80)
   end
@@ -209,10 +220,10 @@ class Player < Struct.new(:r, :d, :beam_charge)
       if planet.collide?(self, 7, 25)
         peeps = [planet.people, 5_000].min
         planet.people -= peeps
-        $window.people_saved += peeps
+        $window.save_people(peeps)
       end
     end
-    self.beam_charge += ($window.people_saved / 1_000_000.0) * 0.001
+    # self.beam_charge += ($window.people_saved / 1_000_000.0) * 0.001
     self.beam_charge = 1.0 if beam_charge > 1.0
   end
 
@@ -255,18 +266,22 @@ end
 class Wall
   NUM = 180
   STEP = 360.0 / NUM
+
+  attr_reader :pulling_speed
+
   def initialize(dst)
     slope = 0
     pos = dst
     @segs = (0...NUM).map do |i|
       if rand(10) == 0
-        slope += (rand(7) - 3) / 5.0
-        slope = slope.clamp(-2, 2)
+        slope += (rand(25) - 12)
+        slope = slope.clamp(-50, 50)
       end
       pos += slope
       pos = pos.clamp(dst - 100, dst + 100)
       pos
     end
+    @pulling_speed = 0.1
   end
 
   def [](r)
@@ -327,7 +342,7 @@ class SolarLiftWindow < Gosu::Window
     @wall = Wall.new(600)
     @objects = []
     last = 0
-    6.times do
+    3.times do
       r = last + 15 + 45 * rand
       last = r
       @objects << Planet.new(r, 150 + rand * 350)
@@ -374,6 +389,10 @@ class SolarLiftWindow < Gosu::Window
     @tickers.each { |t| t.update }
     @objects.reject! { |o| o.update == false }
     @wall.update
+
+    if rand(800) == 0 && objects_of_class(Planet).length < 6
+      @objects << Planet.new(360.0 * rand, 20)
+    end
   end
 
   def draw
@@ -393,9 +412,6 @@ class SolarLiftWindow < Gosu::Window
       gluLookAt(0, -65, -117 + @player.d,
                 0, 0, 800 + @player.d,
                 0, 1, 0)
-      # gluLookAt(0, 0, -275,
-      #           0, 0, 1,
-      #           0, 1, 0)
 
       glRotated(-@player.r, 0, 0, 1)
 
@@ -447,9 +463,9 @@ class SolarLiftWindow < Gosu::Window
     # @font1.draw("Beam Charge: %d%%" % [@player.beam_charge * 100], 5, 25, 0)
   end
 
-  def people_saved=(val)
-    raise "blah" if val < @people_saved
-    @people_saved = val
+  def save_people(val)
+    @people_saved += val
+    @player.beam_charge += val / 6_000_000.0
   end
 end
 
