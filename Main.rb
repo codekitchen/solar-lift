@@ -6,11 +6,17 @@ rescue LoadError
 end
 require 'gosu'
 
+class Actor
+end
+
 class SolarLiftWindow < Gosu::Window
   include Gosu
 
+  attr_reader :objects
+
   def initialize
     super(800, 600, false)
+    @objects = []
   end
 
   def button_up(butt)
@@ -21,9 +27,11 @@ class SolarLiftWindow < Gosu::Window
   end
 
   def update
+    @objects.reject! { |o| o.update == false }
   end
 
   def draw
+    @objects.each { |o| o.draw }
   end
 end
 
