@@ -4,6 +4,8 @@ require 'glu'
 include Gl
 include Glu
 
+require 'weakref'
+
 def saveMatrix
   glPushMatrix
   yield
@@ -17,15 +19,14 @@ def glDraw(t)
 end
 
 VPLANE_RATIO = 75.0 / 800
+DP = 100
 def pointOnPlane(r, dst)
   # dp = 100 - dst * VPLANE_RATIO
-  dp = 100
-  [Gosu.offset_x(r, dp), Gosu.offset_y(r, dp), dst]
+  [Gosu.offset_x(r, DP), Gosu.offset_y(r, DP), dst]
 end
 def drawVertexOnPlane(r, dst)
-  dp = 100 - dst * VPLANE_RATIO
-  dp = 100
-  glVertex3d(Gosu.offset_x(r, dp), Gosu.offset_y(r, dp), dst)
+  # dp = 100 - dst * VPLANE_RATIO
+  glVertex3d(Gosu.offset_x(r, DP), Gosu.offset_y(r, DP), dst)
 end
 def plane_distance(o1, o2)
   # TODO: this isn't even nearly correct
@@ -85,12 +86,28 @@ module GLSprite
   def sprite
     @sprite ||= Gosu::Image.new($window, sprite_name)
   end
+
+  def radius
+    halfsize
+  end
+
+  def collide?(obj, extra_r = 0, extra_d = 0)
+    collide_r?(obj, extra_r) &&
+      obj.d > (d - radius - extra_d) &&
+      obj.d < (d + radius + extra_d)
+  end
+
+  def collide_r?(obj, extra_r = 0)
+    obj.r > (r - radius - extra_r) &&
+      obj.r < (r + radius + extra_r)
+  end
 end
 
 class Ticker
-  def initialize(steps)
+  def initialize(steps, rand_step = nil)
     @cur = @steps = steps
-    $window.tickers << self
+    @rand_step = rand_step
+    $level.tickers << WeakRef.new(self)
   end
 
   def update
@@ -100,7 +117,7 @@ class Ticker
   def fire
     if @cur >= @steps
       yield if block_given?
-      @cur = 0
+      @cur = @rand_step ? -rand(@rand_step) : 0
     end
   end
 end
@@ -110,3 +127,50 @@ class Numeric
     self < lo ? lo : self > hi ? hi : self
   end
 end
+
+class Array
+  def random
+    self[rand(length)]
+  end
+  def shuffle
+    sort_by { rand }
+  end
+end
+
+class Hint < Struct.new(:image_path, :x, :y, :duration, :fade_duration, :txt_height)
+
+  def initialize(*args)
+    super
+    if image_path =~ %r{^images/}
+      @image = Gosu::Image.new($window, image_path)
+    else
+      @image = Gosu::Image.from_text($window, image_path, Gosu.default_font_name, txt_height)
+    end
+    @color = Gosu::Color.new(0xffffffff)
+    @start_msec = Gosu.milliseconds
+  end
+
+  def draw
+    @image.draw_rot(x, y, 0, 0, 0.5, 0.5, 1, 1, @color)
+  end
+
+  def update
+    if @fade_start
+      diff = Gosu.milliseconds - @fade_start
+      return false if diff >= fade_duration
+      @color.alpha = (255 * (1 - diff / fade_duration.to_f)).to_i
+    elsif Gosu.milliseconds - @start_msec >= duration
+      @fade_start = Gosu.milliseconds
+    end
+  end
+
+end
+
+HINTS = {
+  :wsad => ["images/wsad.png", 400, 300, 2500, 1500],
+  :spacebar => ["images/spacebar.png", 400, 55, 2500, 1000],
+  :bullets => ["It's absorbing our bullets!", 400, 300, 2000, 1500, 20],
+  :basics => ["Approach the planets to evacuate our citizens. LMB to fire.", 400, 400, 2000, 1500, 20],
+}
+
+SHOWN_HINTS = {}
