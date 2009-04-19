@@ -70,13 +70,19 @@ class Level
   def width; $window.width; end
   def height; $window.height; end
 
+  BGCOLOR = Gosu::Color.new(19, 20, 8)
+
   def draw
+    # $window.draw_quad(0, 0, BGCOLOR,
+    #                   width, 0, BGCOLOR,
+    #                   0, height, BGCOLOR,
+    #                   width, height, BGCOLOR)
     $window.gl do
       glGetError
       glEnable(GL_BLEND)
       glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
       glDisable(GL_DEPTH_TEST)
-      glClear(GL_COLOR_BUFFER_BIT)
+      # glClear(GL_COLOR_BUFFER_BIT)
 
       glMatrixMode(GL_PROJECTION)
       glLoadIdentity
@@ -92,6 +98,21 @@ class Level
 
       dp = 100
 
+      glDraw(GL_QUAD_STRIP) do
+        glColor4d(0.074, 0.078, 0.0313, 1)
+        drawVertexOnPlane(0, 0)
+        drawVertexOnPlane(0, 800)
+        0.step(358, 2) do |i|
+          # r = (360.0 / 10) * i
+          drawVertexOnPlane(i, 0)
+          drawVertexOnPlane(i, 800)
+        end
+        drawVertexOnPlane(0, 0)
+        drawVertexOnPlane(0, 800)
+      end
+
+      @wall.draw_gl
+
       glDraw(GL_LINES) do
         10.times do |i|
           r = (360.0 / 10) * i
@@ -100,18 +121,18 @@ class Level
           glColor4d(1, 1, 1, 0.05)
           drawVertexOnPlane(r, 800)
         end
-        360.times do |i|
-          glColor4d(1, 1, 1, 0.2)
-          drawVertexOnPlane(i, 0)
-          drawVertexOnPlane(i+1, 0)
-          glColor4d(1, 1, 1, 0.05)
-          drawVertexOnPlane(i, 800)
-          drawVertexOnPlane(i+1, 800)
-        end
       end
 
-      @wall.draw_gl
-
+      glDraw(GL_LINES) do
+        0.step(358, 2) do |i|
+          glColor4d(1, 1, 1, 0.2)
+          drawVertexOnPlane(i, 0)
+          drawVertexOnPlane(i+2, 0)
+          # glColor4d(0.56, 0.11, 0.04, 0.2)
+          # drawVertexOnPlane(i, 800)
+          # drawVertexOnPlane(i+2, 800)
+        end
+      end
       # glEnable(GL_DEPTH_TEST)
       # glClear(GL_DEPTH_BUFFER_BIT)
 

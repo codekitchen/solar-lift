@@ -166,6 +166,14 @@ class Hint < Struct.new(:image_path, :x, :y, :duration, :fade_duration, :txt_hei
 
 end
 
+def blend_color(c1, c2, mult = 0.5)
+  Gosu::Color.new(
+    (c1.red * (1 - mult) + c2.red * mult).floor,
+    (c1.green * (1 - mult) + c2.green * mult).floor,
+    (c1.blue * (1 - mult) + c2.blue * mult).floor
+  )
+end
+
 HINTS = {
   :wsad => ["images/wsad.png", 400, 300, 2500, 1500],
   :spacebar => ["images/spacebar.png", 400, 55, 2500, 1000],

@@ -180,9 +180,19 @@ class Planet < Struct.new(:r, :d, :people)
   include GLSprite
   RADIUS = 10
 
+  COLORS = [
+    Gosu::Color.new(74, 93, 67),
+    Gosu::Color.new(141, 144, 85),
+    Gosu::Color.new(209, 195, 104),
+  ]
+
+  RED = Gosu::Color.new(225, 0, 0)
+  WHITE = Gosu::Color.new(250, 250, 250)
+
   def initialize(r, d, people = 3_000_000 + rand(2_000_000))
     super
     @red = 0
+    @color = COLORS.random
     self.people = people
   end
 
@@ -190,14 +200,17 @@ class Planet < Struct.new(:r, :d, :people)
     saveMatrix do
       glRotated(r, 0, 0, 1)
       glTranslated(0, -100, d)
-      glColor4d((@people_color + @red).clamp(0, 1), 1 - @red, (@people_color - @red).clamp(0, 1), 1)
+      color = blend_color(@people_color, RED, @red)
+      glColor4d(color.red / 255.0, color.green / 255.0, color.blue / 255.0, 1)
+      # glColor4d((@people_color + @red).clamp(0, 1), 1 - @red, (@people_color - @red).clamp(0, 1), 1)
       glutSolidSphere(RADIUS, 20, 20)
     end
   end
 
   def people=(val)
     super
-    @people_color = 1.0 - (people / 5_000_000.0)
+    @people_color = blend_color(WHITE, @color, people / 5_000_000.0)
+    # @people_color = 1.0 - (people / 5_000_000.0)
   end
 
   def radius
@@ -353,22 +366,25 @@ class Wall
   def draw_gl
     # fixme
     glDraw(GL_QUAD_STRIP) do
-      col = 0.75 - 0.75 * (@segs[0] / 800.0)
-      glColor4d(1, 0, 0, col);
+      # col = 0.75 - 0.75 * (@segs[0] / 800.0)
+      mult = (800.0 - @segs[0]) / 800
+      glColor4d(0.56 * mult, 0.11 * mult, 0.04 * mult, 1);
       drawVertexOnPlane(0, @segs[0])
-      glColor4d(1, 0, 0, 0);
+      glColor4d(0, 0, 0, 1);
       drawVertexOnPlane(0, 800)
       @segs.each_with_index do |w,i|
-        col = 0.75 - 0.75 * (w / 800.0)
-        glColor4d(1, 0, 0, col);
+        mult = (800.0 - w) / 800
+        # col = 0.75 - 0.75 * (w / 800.0)
+        glColor4d(0.56 * mult, 0.11 * mult, 0.04 * mult, 1);
         drawVertexOnPlane(i*STEP, w)
-        glColor4d(1, 0, 0, 0);
+        glColor4d(0, 0, 0, 1);
         drawVertexOnPlane(i*STEP, 800)
       end
-      col = 0.75 - 0.75 * (@segs[0] / 800.0)
-      glColor4d(1, 0, 0, col);
+      # col = 0.75 - 0.75 * (@segs[0] / 800.0)
+      mult = (800.0 - @segs[0]) / 800
+      glColor4d(0.56 * mult, 0.11 * mult, 0.04 * mult, 1);
       drawVertexOnPlane(0, @segs[0])
-      glColor4d(1, 0, 0, 0);
+      glColor4d(0, 0, 0, 1);
       drawVertexOnPlane(0, 800)
     end
   end
