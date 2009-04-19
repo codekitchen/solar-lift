@@ -60,6 +60,7 @@ class EnemyShip < Struct.new(:r, :d)
 
   def wander
     self.d += 4 * @dir
+    self.d -= 4 * @dir if d > 1000 || d < 0
     @dir = -@dir if rand(30) == 0
     self.r += rand(SPD*2) - SPD if rand(3) == 0
     fire
@@ -251,8 +252,8 @@ class Player < Struct.new(:r, :d, :beam_charge)
 
   def update
     if $level.wall.collide?(r, d)
-      #DEATH
-      $window.close
+      #DEATH!
+      # $window.close
     end
     collision = false
     $level.objects_of_class(Planet).each do |planet|

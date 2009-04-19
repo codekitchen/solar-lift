@@ -62,7 +62,7 @@ class Level
     @ui_objects.reject! { |o| o.update == false }
     @wall.update
 
-    if rand(800) == 0 && objects_of_class(Planet).length < 6
+    if rand(700) == 0 && objects_of_class(Planet).length < 6
       @objects << Planet.new(360.0 * rand, 20)
     end
   end

@@ -169,7 +169,7 @@ end
 HINTS = {
   :wsad => ["images/wsad.png", 400, 300, 2500, 1500],
   :spacebar => ["images/spacebar.png", 400, 55, 2500, 1000],
-  :bullets => ["It's absorbing our bullets!", 400, 300, 2000, 1500, 20],
+  :bullets => ["It's absorbing our bullets!", 400, 360, 2000, 1500, 20],
   :basics => ["Approach the planets to evacuate our citizens. LMB to fire.", 400, 400, 2000, 1500, 20],
 }
 
